@@ -4,15 +4,26 @@ services:
     # The official v2 Traefik docker image
     image: traefik:v2.3
     # Enables the web UI and tells Traefik to listen to docker
-    command: --api.insecure=true --providers.docker
+    command: 
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      #- "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.myresolver.acme.email=${TLS_CERT_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
     ports:
       # The HTTP port
-      - "80:80"
+      - "443:443"
       # The Web UI (enabled by --api.insecure=true)
       - "8080:8080"
     volumes:
       # So that Traefik can listen to the Docker events
       - /var/run/docker.sock:/var/run/docker.sock
+      # just mount it and magic will happen
+      - "./letsencrypt:/letsencrypt"
 
   server:
     build:
@@ -28,6 +39,9 @@ services:
       - .env
     labels:
     - "traefik.http.routers.server.rule=Host(`${CANONICAL_URL}`)"
+    - "traefik.enable=true"
+    - "traefik.http.routers.server.entrypoints=websecure"
+    - "traefik.http.routers.server.tls.certresolver=myresolver"
     
   database:
     image: "postgres" # use latest official postgres version
