@@ -1,0 +1,55 @@
+version: "3"
+services:
+  reverse-proxy:
+    # The official v2 Traefik docker image
+    image: traefik:v2.3
+    # Enables the web UI and tells Traefik to listen to docker
+    command: --api.insecure=true --providers.docker
+    ports:
+      # The HTTP port
+      - "80:80"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  server:
+    build:
+      .
+    depends_on:
+      - database
+      - redis
+    ports:
+      - "3000:3000"
+    environment:
+        DEBUG: "speckle:*"
+    env_file:
+      - .env
+    labels:
+    - "traefik.http.routers.server.rule=Host(`${CANONICAL_URL}`)"
+    
+  database:
+    image: "postgres" # use latest official postgres version
+    env_file:
+      - .env # configure postgres
+    volumes:
+      # persist data even if container shuts down
+      - speckle-postgres-data:/var/lib/postgresql/data/
+      # this mounts the initdb folder to the db container
+      # .sql .sh files are executed from this folder in alphabetical order
+      - ./initdb:/docker-entrypoint-initdb.d  
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: "redis"
+    # ports:
+    #   - "6379:6379" # It is not neccesary to expose the reddis port if running the app with compose 
+    volumes:
+      - redis_volume_data:/data
+
+volumes:
+# named volumes can be managed easier using docker-compose
+  speckle-postgres-data: 
+  redis_volume_data:
